@@ -6,6 +6,7 @@ import {
 import {
   BERCOS, PRODUTOS, SISTEMAS_CAIS, pranchaNorma, bercoCompativel, aprovadorHorasExcedentes
 } from './normaEmap.js';
+import { CENA_W, CENA_H, desenharCena, velocidadeParticula } from './cenaTegram.js';
 
 // --- SUPOSIÇÕES DO SIMULADOR (NÃO VÊM DA NORMA) ---
 // O equipamento de cais opera exatamente na prancha mínima do Cap. 9; as demais etapas
@@ -32,7 +33,7 @@ const EQUIPAMENTOS = {
   ],
   armazenagem: [
     { id: 'patio', nome: 'Pátio Aberto / Armazém Plano', vazaoMax: 350, capex: 5.0, opex: 8, esg: 30 },
-    { id: 'silo', nome: 'Silos e Armazéns Automatizados', vazaoMax: 2000, capex: 28.0, opex: 2.0, esg: 96 }
+    { id: 'silo', nome: 'Armazéns Graneleiros (TEGRAM) e Silos', vazaoMax: 2000, capex: 28.0, opex: 2.0, esg: 96 }
   ],
   expedicao: [
     { id: 'bica_rod', nome: 'Bica Rodoviária Simples', nomeEmbarque: 'Tombador Rodoviário Simples', vazaoMax: 300, capex: 1.0, opex: 6, esg: 50 },
@@ -61,15 +62,6 @@ const sistemaValido = (produto, berco, preferido, ordem = SISTEMAS_CAIS) =>
   pranchaNorma(produto, berco, preferido).valor
     ? preferido
     : ordem.find(s => pranchaNorma(produto, berco, s).valor);
-
-// Pontos do percurso no Porto do Itaqui (sentido descarga: navio -> terra)
-const WAYPOINTS = [
-  { x: 120, y: 190 }, // Porão do Navio
-  { x: 230, y: 150 }, // Equipamento no Cais
-  { x: 420, y: 150 }, // Galeria / Correia / Caminho
-  { x: 580, y: 110 }, // Silos / Armazém
-  { x: 730, y: 170 }  // Ferrovia / Rodovia
-];
 
 export default function ItaquiPortSimulator() {
   // --- ESTADOS DA SIMULAÇÃO ---
@@ -166,188 +158,44 @@ export default function ItaquiPortSimulator() {
   // Estado lido pelo loop de animação; atualizado a cada render sem reiniciar o loop.
   const animRef = useRef(null);
   animRef.current = {
-    sistemaCais, eqTransp, eqArmaz, eqExp, gargaloRefs, gargaloTexto, emExecucao,
-    berco, produto, embarque, pranchaPraticadaTh
+    sistemaCais, transporte: eqTransp.id, armazenagem: eqArmaz.id, expedicao: eqExp.id,
+    gargaloRefs, gargaloTexto, emExecucao, berco, produto, embarque, pranchaPraticadaTh,
+    vazaoTexto: fmtTh(pranchaPraticadaTh)
   };
 
-  // --- ANIMAÇÃO EM CANVAS HTML5 (FLUXO VIVO) ---
+  // --- ANIMAÇÃO EM CANVAS HTML5: CENA DO TEGRAM ---
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    // Resolução nítida em telas de alta densidade
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = CENA_W * dpr;
+    canvas.height = CENA_H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     let animationFrameId;
+    let relogio = 0;
+    let anterior = performance.now();
 
-    const particles = Array.from({ length: 60 }, () => ({
+    const particulas = Array.from({ length: 70 }, () => ({
       progress: Math.random(),
-      size: Math.random() * 3 + 2,
+      size: Math.random() * 1.8 + 1.6,
       jitter: Math.random() * 4 - 2
     }));
 
-    const render = () => {
+    const render = (agora = performance.now()) => {
       const s = animRef.current;
-      const speed = (s.pranchaPraticadaTh / 1000) * 0.008 + 0.002;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // 1. Fundo, mar e cais
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(0, 210, canvas.width, canvas.height - 210);
-
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let x = 0; x < canvas.width; x += 20) {
-        ctx.lineTo(x, 215 + Math.sin((x + Date.now() * 0.05) * 0.05) * 2);
-      }
-      ctx.stroke();
-
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(180, 170, 600, 40);
-      ctx.fillStyle = '#475569';
-      ctx.fillRect(180, 170, 600, 6);
-
-      // 2. Navio atracado
-      ctx.fillStyle = '#94a3b8';
-      ctx.beginPath();
-      ctx.moveTo(30, 210);
-      ctx.lineTo(60, 240);
-      ctx.lineTo(210, 240);
-      ctx.lineTo(220, 210);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#dc2626';
-      ctx.fillRect(60, 230, 150, 10);
-
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(80, 212, 35, 12);
-      ctx.fillRect(125, 212, 35, 12);
-      ctx.fillRect(170, 212, 35, 12);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`${s.berco.nome} — ${s.produto.nome} (${s.embarque ? 'Embarque' : 'Descarga'})`, 40, 200);
-
-      // 3. Equipamento do cais
-      if (s.gargaloRefs.includes('cais')) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(210, 100, 50, 75);
-      }
-
-      if (s.sistemaCais === 'mec') {
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(225, 110, 20, 60);
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(210, 110, 50, 8); // Lança
-      } else {
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(230, 170);
-        ctx.lineTo(240, 120);
-        ctx.lineTo(210, 140);
-        ctx.stroke();
-        if (s.sistemaCais === 't2') {
-          // Segundo terno
-          ctx.beginPath();
-          ctx.moveTo(255, 170);
-          ctx.lineTo(262, 128);
-          ctx.lineTo(240, 145);
-          ctx.stroke();
-        }
-      }
-
-      // 4. Transporte interno
-      if (s.gargaloRefs.includes('transp')) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(260, 135, 280, 30);
-      }
-
-      ctx.strokeStyle = s.eqTransp.id === 'correia' ? '#10b981' : '#64748b';
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(WAYPOINTS[1].x, WAYPOINTS[1].y);
-      ctx.lineTo(WAYPOINTS[2].x, WAYPOINTS[2].y);
-      ctx.lineTo(WAYPOINTS[3].x, WAYPOINTS[3].y);
-      ctx.stroke();
-
-      // 5. Armazenagem
-      if (s.gargaloRefs.includes('armaz')) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(550, 70, 70, 90);
-      }
-
-      if (s.eqArmaz.id === 'silo') {
-        ctx.fillStyle = '#cbd5e1';
-        ctx.fillRect(560, 80, 22, 70);
-        ctx.fillRect(585, 80, 22, 70);
-        ctx.fillStyle = '#64748b';
-        ctx.beginPath(); ctx.arc(571, 80, 11, Math.PI, 0); ctx.fill();
-        ctx.beginPath(); ctx.arc(596, 80, 11, Math.PI, 0); ctx.fill();
-      } else {
-        ctx.fillStyle = s.produto.cor;
-        ctx.beginPath();
-        ctx.moveTo(550, 150);
-        ctx.lineTo(585, 100);
-        ctx.lineTo(620, 150);
-        ctx.fill();
-      }
-
-      // 6. Expedição / recepção
-      if (s.gargaloRefs.includes('exp')) {
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(700, 130, 70, 50);
-      }
-
-      if (s.eqExp.id === 'pera_ferro') {
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(700, 160, 30, 14);
-        ctx.fillRect(735, 160, 30, 14);
-        ctx.fillStyle = '#0284c7';
-        ctx.fillRect(680, 155, 18, 19); // Locomotiva
-      } else {
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(710, 155, 25, 15);
-      }
-
-      // 7. Partículas da carga, na cor do produto. Pausado: congeladas na posição atual.
-      const totalSegments = WAYPOINTS.length - 1;
-      ctx.fillStyle = s.produto.cor;
-      particles.forEach(p => {
-        if (s.emExecucao) {
-          p.progress += speed;
+      // O relógio só avança com o fluxo ligado: pausar congela trem, caminhões e carga
+      if (s.emExecucao) {
+        relogio += agora - anterior;
+        const v = velocidadeParticula(s.pranchaPraticadaTh);
+        particulas.forEach(p => {
+          p.progress += v;
           if (p.progress >= 1) p.progress -= 1;
-        }
-
-        // Embarque percorre o caminho no sentido inverso (terra -> navio)
-        const t = s.embarque ? 1 - p.progress : p.progress;
-        const segIndex = Math.min(Math.floor(t * totalSegments), totalSegments - 1);
-        const segProgress = (t * totalSegments) - segIndex;
-
-        const p1 = WAYPOINTS[segIndex];
-        const p2 = WAYPOINTS[segIndex + 1];
-
-        const x = p1.x + (p2.x - p1.x) * segProgress;
-        const y = p1.y + (p2.y - p1.y) * segProgress;
-
-        ctx.beginPath();
-        ctx.arc(x, y + p.jitter, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Legenda de gargalo
-      ctx.fillStyle = '#ef4444';
-      ctx.font = 'bold 12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`GARGALO ATUAL: ${s.gargaloTexto.toUpperCase()} (${fmtTh(s.pranchaPraticadaTh)} t/h)`, 470, 35);
-      ctx.textAlign = 'left';
-
+        });
+      }
+      anterior = agora;
+      desenharCena(ctx, s, relogio, particulas);
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -407,7 +255,7 @@ export default function ItaquiPortSimulator() {
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 relative overflow-hidden shadow-2xl">
           <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Zap size={14} className="text-amber-400" /> Vista Operacional do Berço (Tempo Real)
+              <Zap size={14} className="text-amber-400" /> Vista Aérea do TEGRAM (Tempo Real)
             </span>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Gargalo também em HTML: no canvas reduzido (celular) o texto fica ilegível */}
@@ -422,8 +270,11 @@ export default function ItaquiPortSimulator() {
 
           <canvas
             ref={canvasRef}
-            width={800}
-            height={250}
+            width={CENA_W}
+            height={CENA_H}
+            role="img"
+            aria-label={`Vista aérea do TEGRAM: ${gargalos.length > 1 ? 'gargalos' : 'gargalo'} em ${gargaloTexto}`}
+            style={{ aspectRatio: `${CENA_W} / ${CENA_H}` }}
             className="w-full h-auto rounded-lg bg-slate-950 border border-slate-800/80"
           />
 
