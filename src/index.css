@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Visual escuro único (sala de controle portuária) */
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #020617;
+  color: #f1f5f9;
+}
+
+/* Margem lateral que respeita as áreas seguras do celular */
+.app-shell {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 768px) {
+  .app-shell {
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+}

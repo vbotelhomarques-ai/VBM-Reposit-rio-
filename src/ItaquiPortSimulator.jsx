@@ -311,7 +311,7 @@ export default function ItaquiPortSimulator() {
   }, []);
 
   return (
-    <div className="w-full min-h-screen bg-slate-950 text-slate-100 p-4 md:p-6 font-sans">
+    <div className="app-shell w-full min-h-screen bg-slate-950 text-slate-100 py-4 md:py-6 font-sans">
       {/* CABEÇALHO DA APLICAÇÃO */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center pb-4 mb-6 border-b border-slate-800 gap-4">
         <div>
@@ -360,9 +360,15 @@ export default function ItaquiPortSimulator() {
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <Zap size={14} className="text-amber-400" /> Vista Operacional do Berço (Tempo Real)
             </span>
-            <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700">
-              Vazão Efetiva: <strong className="text-sky-400 font-mono">{pranchaPraticadaTh} t/h</strong>
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Gargalo também em HTML: no canvas reduzido (celular) o texto fica ilegível */}
+              <span className="text-xs bg-rose-950/50 text-rose-300 px-2.5 py-1 rounded-full border border-rose-500/40">
+                Gargalo: <strong>{gargalo.etapa}</strong>
+              </span>
+              <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700">
+                Vazão Efetiva: <strong className="text-sky-400 font-mono">{pranchaPraticadaTh} t/h</strong>
+              </span>
+            </div>
           </div>
 
           <canvas
@@ -373,7 +379,7 @@ export default function ItaquiPortSimulator() {
           />
 
           {/* PAINEL DE ALERTA NORMA EMAP */}
-          <div className={`mt-3 p-3 rounded-lg flex items-center justify-between gap-2 text-xs border ${
+          <div className={`mt-3 p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs border ${
             emConformidadeEMAP
               ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
               : 'bg-rose-950/50 border-rose-500/40 text-rose-300'
