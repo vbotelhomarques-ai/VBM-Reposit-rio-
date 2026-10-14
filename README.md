@@ -12,11 +12,26 @@ npm run dev      # servidor de desenvolvimento
 npm run build    # build de produção em dist/
 ```
 
-## Notas sobre o modelo
+## Base normativa
 
-- **Sentido da operação:** soja, milho e farelo são tratados como *embarque* (exportação, terra → navio);
-  fertilizante como *descarga* (importação, navio → terra). A animação e os rótulos se ajustam.
-- **Berço:** o lote máximo do navio é limitado pelo DWT máximo do berço selecionado.
-- **OPEX/ton:** soma do custo de todas as etapas (cada tonelada passa por todas elas).
-- **Dados:** os valores de berços, pranchas e custos são referências pedagógicas.
-  Confira com a Norma EMAP vigente antes de uso oficial.
+Os dados de `src/normaEmap.js` vêm da *Norma para Atracação e Desatracação de Navios no Porto
+Organizado do Itaqui* (EMAP, revisão 2023):
+
+- **Cap. 3 (item 3.1):** características dos berços 99 a 105 (calado, LOA, boca, calado aéreo, DWT, tipos de navio).
+- **Cap. 9 (item 9.1):** pranchas mínimas de granéis sólidos, por produto, berço e sistema:
+  mecanizado (por berço), não mecanizado de descarga (berços 99 a 103, com desconto de 20% no berço 104)
+  e não mecanizado de carregamento (2/3 ternos e 1 terno). Produto sem prancha num berço ou sistema
+  aparece desabilitado, com o motivo.
+- **Item 10.7:** abaixo da prancha mínima o navio fica sujeito a desatracar e voltar à fila;
+  horas excedentes são aprovadas pelo Gerente (até 12 h) ou pelo Diretor de Operações (acima de 12 h).
+- **Cap. 8 e item 7.1 §2º:** preferências por aparelhamento especial de cais e de exportação dependem de cumprir a prancha.
+
+## Suposições do simulador (fora da norma)
+
+- O equipamento de cais opera exatamente na prancha mínima do Cap. 9.
+- As capacidades de transporte interno, armazenagem e expedição/recepção, o CAPEX, o OPEX, o índice ESG
+  e a demurrage (contratual) são ilustrativos.
+- Carregamento não mecanizado: a tabela da norma não indica berços; o simulador aceita qualquer berço de
+  granel sólido (GS), sem o desconto do berço 104.
+- Granéis líquidos e carga geral não fazem parte da cadeia simulada.
+- **OPEX/ton** é a soma do custo de todas as etapas (cada tonelada passa por todas elas).
