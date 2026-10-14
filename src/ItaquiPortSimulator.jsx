@@ -42,6 +42,10 @@ const DATAS_ITAQUI = {
 const TAMANHO_NAVIO_MIN = 30000;
 const TAMANHO_NAVIO_MAX = 120000;
 const TAMANHO_NAVIO_STEP = 5000;
+const DEMURRAGE_MAX = 10000000; // US$/dia; evita estouro numérico (US$ ∞)
+
+// Números no padrão brasileiro (vírgula decimal, ponto de milhar)
+const fmt = (n, casas) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
 
 // Pontos do percurso no Porto do Itaqui (sentido descarga: navio -> terra)
 const WAYPOINTS = [
@@ -57,7 +61,9 @@ export default function ItaquiPortSimulator() {
   const [bercoSelecionado, setBercoSelecionado] = useState(DATAS_ITAQUI.bercos[0]);
   const [produtoSelecionado, setProdutoSelecionado] = useState(DATAS_ITAQUI.produtos[0]);
   const [tamanhoNavio, setTamanhoNavio] = useState(60000); // Toneladas DWT
-  const [custoDemurrageDia, setCustoDemurrageDia] = useState(25000); // US$/dia
+  // O texto do campo fica em estado próprio para permitir apagar e digitar livremente
+  const [demurrageTexto, setDemurrageTexto] = useState('25000');
+  const custoDemurrageDia = Math.min(DEMURRAGE_MAX, Math.max(0, Number(demurrageTexto) || 0)); // US$/dia
 
   // Escolhas de Equipamento
   const [eqCais, setEqCais] = useState(DATAS_ITAQUI.equipamentosCais[0]);
@@ -95,9 +101,12 @@ export default function ItaquiPortSimulator() {
     { etapa: embarque ? 'Recepção Terrestre' : 'Expedição', vazao: eqExp.vazaoMax, ref: 'exp' }
   ];
 
-  // O gargalo é determinado pelo elo mais fraco da cadeia (Teoria das Restrições)
-  const gargalo = capacidades.reduce((min, item) => item.vazao < min.vazao ? item : min, capacidades[0]);
-  const pranchaPraticadaTh = gargalo.vazao;
+  // O gargalo é determinado pelo elo mais fraco da cadeia (Teoria das Restrições).
+  // Em caso de empate há mais de um gargalo: melhorar só um deles não aumenta a vazão.
+  const pranchaPraticadaTh = Math.min(...capacidades.map(c => c.vazao));
+  const gargalos = capacidades.filter(c => c.vazao === pranchaPraticadaTh);
+  const gargaloRefs = gargalos.map(g => g.ref);
+  const gargaloTexto = gargalos.map(g => g.etapa).join(' + ');
   const pranchaPraticadaTdia = pranchaPraticadaTh * 24;
 
   // Meta Oficial Itaqui (para o produto selecionado em sistema mecanizado)
@@ -106,7 +115,7 @@ export default function ItaquiPortSimulator() {
 
   // Métricas de Tempo e Custos
   const horasOperacionais = Math.ceil(tamanhoNavio / pranchaPraticadaTh);
-  const diasEstadia = (horasOperacionais / 24).toFixed(1);
+  const diasEstadia = fmt(horasOperacionais / 24, 1);
 
   // Atraso com valores exatos (sem o arredondamento das horas) para não gerar multa fantasma a 100% da meta
   const diasAtraso = Math.max(0, (tamanhoNavio / pranchaPraticadaTdia) - (tamanhoNavio / pranchaOficialEMAPTdia));
@@ -118,14 +127,14 @@ export default function ItaquiPortSimulator() {
 
   // Finanças e ESG
   // Cada tonelada passa por todas as etapas: o OPEX por tonelada é a soma, não a média.
-  const capexTotal = (eqCais.capex + eqTransp.capex + eqArmaz.capex + eqExp.capex).toFixed(1);
-  const opexPorTonelada = (eqCais.opex + eqTransp.opex + eqArmaz.opex + eqExp.opex).toFixed(2);
+  const capexTotal = fmt(eqCais.capex + eqTransp.capex + eqArmaz.capex + eqExp.capex, 1);
+  const opexPorTonelada = fmt(eqCais.opex + eqTransp.opex + eqArmaz.opex + eqExp.opex, 2);
   const indiceESG = Math.round((eqCais.esg + eqTransp.esg + eqArmaz.esg + eqExp.esg) / 4);
 
   // Estado lido pelo loop de animação; atualizado a cada render sem reiniciar o loop.
   const animRef = useRef(null);
   animRef.current = {
-    eqCais, eqTransp, eqArmaz, eqExp, gargalo, emExecucao, bercoSelecionado, embarque, pranchaPraticadaTh
+    eqCais, eqTransp, eqArmaz, eqExp, gargaloRefs, gargaloTexto, emExecucao, bercoSelecionado, embarque, pranchaPraticadaTh
   };
 
   // --- ANIMAÇÃO EM CANVAS HTML5 (FLUXO VIVO) ---
@@ -195,7 +204,7 @@ export default function ItaquiPortSimulator() {
       ctx.fillText(`${s.bercoSelecionado.nome} (Itaqui) — ${s.embarque ? 'Embarque' : 'Descarga'}`, 40, 200);
 
       // 3. Equipamento do Cais (Grab ou CSU / Shiploader)
-      if (s.gargalo.ref === 'cais') {
+      if (s.gargaloRefs.includes('cais')) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 2;
         ctx.strokeRect(210, 100, 50, 75);
@@ -217,7 +226,7 @@ export default function ItaquiPortSimulator() {
       }
 
       // 4. Transporte Interno (Galeria de Correia ou Caminhões)
-      if (s.gargalo.ref === 'transp') {
+      if (s.gargaloRefs.includes('transp')) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 2;
         ctx.strokeRect(260, 135, 280, 30);
@@ -232,7 +241,7 @@ export default function ItaquiPortSimulator() {
       ctx.stroke();
 
       // 5. Armazenagem (Silos ou Pátio)
-      if (s.gargalo.ref === 'armaz') {
+      if (s.gargaloRefs.includes('armaz')) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 2;
         ctx.strokeRect(550, 70, 70, 90);
@@ -255,7 +264,7 @@ export default function ItaquiPortSimulator() {
       }
 
       // 6. Expedição / Recepção (Comboio / Caminhão)
-      if (s.gargalo.ref === 'exp') {
+      if (s.gargaloRefs.includes('exp')) {
         ctx.strokeStyle = '#ef4444';
         ctx.lineWidth = 2;
         ctx.strokeRect(700, 130, 70, 50);
@@ -300,7 +309,9 @@ export default function ItaquiPortSimulator() {
       // Legenda de Gargalo
       ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(`GARGALO ATUAL: ${s.gargalo.etapa.toUpperCase()} (${s.gargalo.vazao} t/h)`, 380, 35);
+      ctx.textAlign = 'center';
+      ctx.fillText(`GARGALO ATUAL: ${s.gargaloTexto.toUpperCase()} (${s.pranchaPraticadaTh} t/h)`, 470, 35);
+      ctx.textAlign = 'left';
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -363,7 +374,7 @@ export default function ItaquiPortSimulator() {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Gargalo também em HTML: no canvas reduzido (celular) o texto fica ilegível */}
               <span className="text-xs bg-rose-950/50 text-rose-300 px-2.5 py-1 rounded-full border border-rose-500/40">
-                Gargalo: <strong>{gargalo.etapa}</strong>
+                {gargalos.length > 1 ? 'Gargalos (empate)' : 'Gargalo'}: <strong>{gargaloTexto}</strong>
               </span>
               <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700">
                 Vazão Efetiva: <strong className="text-sky-400 font-mono">{pranchaPraticadaTh} t/h</strong>
@@ -414,14 +425,14 @@ export default function ItaquiPortSimulator() {
               <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
                 <span className="text-[11px] text-slate-400 block">Prancha Praticada</span>
                 <span className="text-lg font-mono font-bold text-sky-400">
-                  {(pranchaPraticadaTdia / 1000).toFixed(1)}k <span className="text-xs font-normal">t/dia</span>
+                  {fmt(pranchaPraticadaTdia / 1000, 1)}k <span className="text-xs font-normal">t/dia</span>
                 </span>
               </div>
 
               <div className="bg-slate-950 p-3 rounded-lg border border-slate-800/80">
                 <span className="text-[11px] text-slate-400 block">Meta Itaqui (Mecanizada)</span>
                 <span className="text-lg font-mono font-bold text-slate-200">
-                  {(pranchaOficialEMAPTdia / 1000).toFixed(1)}k <span className="text-xs font-normal">t/dia</span>
+                  {fmt(pranchaOficialEMAPTdia / 1000, 1)}k <span className="text-xs font-normal">t/dia</span>
                 </span>
               </div>
 
@@ -532,18 +543,23 @@ export default function ItaquiPortSimulator() {
               className="w-full accent-sky-500 bg-slate-950 h-1.5 rounded-lg appearance-none cursor-pointer"
             />
             <span className="text-[10px] text-slate-500 block mt-1">
-              Limite do {bercoSelecionado.nome}: {loteMax.toLocaleString('pt-BR')} t
+              {bercoSelecionado.dwtMax > TAMANHO_NAVIO_MAX
+                ? `Limite do simulador: ${loteMax.toLocaleString('pt-BR')} t (${bercoSelecionado.nome} aceita até ${bercoSelecionado.dwtMax.toLocaleString('pt-BR')} t)`
+                : `Limite do ${bercoSelecionado.nome}: ${loteMax.toLocaleString('pt-BR')} t`}
             </span>
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 block mb-1">Demurrage (US$/dia)</label>
+            <label htmlFor="demurrage-dia" className="text-xs text-slate-400 block mb-1">Demurrage (US$/dia)</label>
             <input
+              id="demurrage-dia"
               type="number"
               min={0}
+              max={DEMURRAGE_MAX}
               step={1000}
-              value={custoDemurrageDia}
-              onChange={(e) => setCustoDemurrageDia(Math.max(0, Number(e.target.value) || 0))}
+              value={demurrageTexto}
+              onChange={(e) => setDemurrageTexto(e.target.value)}
+              onBlur={() => setDemurrageTexto(String(custoDemurrageDia))}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-sky-500"
             />
           </div>
