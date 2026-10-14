@@ -37,7 +37,7 @@ const EQUIPAMENTOS = {
   ],
   expedicao: [
     { id: 'bica_rod', nome: 'Bica Rodoviária Simples', nomeEmbarque: 'Tombador Rodoviário Simples', vazaoMax: 300, capex: 1.0, opex: 6, esg: 50 },
-    { id: 'pera_ferro', nome: 'Pêra Ferroviária Automatizada', nomeEmbarque: 'Pêra Ferroviária / Descarga de Vagões', vazaoMax: 1600, capex: 18.0, opex: 1.8, esg: 94 }
+    { id: 'pera_ferro', nome: 'Moega Ferroviária', nomeEmbarque: 'Moega Ferroviária', vazaoMax: 1600, capex: 18.0, opex: 1.8, esg: 94 }
   ]
 };
 
@@ -690,7 +690,7 @@ export default function ItaquiPortSimulator() {
                 aplicarBerco(bercoMec, produto, 'mec');
                 setEqTransp(EQUIPAMENTOS.transporteInterno[1]); // Correia
                 setEqArmaz(EQUIPAMENTOS.armazenagem[1]); // Silos
-                setEqExp(EQUIPAMENTOS.expedicao[1]); // Pêra
+                setEqExp(EQUIPAMENTOS.expedicao[1]); // Moega ferroviária
               }}
               className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-500/10 transition-all"
             >

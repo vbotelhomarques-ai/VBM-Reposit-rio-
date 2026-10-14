@@ -24,8 +24,6 @@ const COR = {
   parede: '#9b8f84',
   portao: '#3f3a36',
   piso: '#2a2f2a',
-  silo: '#c9a48a',
-  siloTopo: '#e2c4ad',
   esteira: '#a0533b',
   esteiraTrelica: '#5c2f22',
   torre: '#1d4ed8',
@@ -51,13 +49,11 @@ const AGUA = [[470, 0], [800, 0], [800, 205], [745, 178], [665, 124], [592, 84],
 const PIER_RAIZ = { x: 588, y: 86 };
 const PIER = { x1: 600, x2: 792, y: 58, esp: 10 };
 const ARMAZENS = [0, 1, 2, 3].map(i => ({ x: 25 + i * 30, y: 300 - i * 46, L: 235, D: 38 }));
-const SILOS = [
-  [522, 108], [541, 108], [560, 108], [579, 108],
-  [531, 126], [550, 126], [569, 126]
-];
 const CABECA_ESTEIRA = { x: 370, y: 181 }; // fim do coletor junto ao armazém mais alto
 const COLETOR = [{ x: 280, y: 319 }, CABECA_ESTEIRA];
-const ESTEIRA_PRINCIPAL = [CABECA_ESTEIRA, { x: 515, y: 140 }, PIER_RAIZ, { x: 640, y: PIER.y }];
+// Esteira principal: do TEGRAM direto ao píer, com torre de transferência no meio do vão
+const TORRE_MEIO = { x: 480, y: 133 };
+const ESTEIRA_PRINCIPAL = [CABECA_ESTEIRA, TORRE_MEIO, PIER_RAIZ, { x: 640, y: PIER.y }];
 
 const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 const angulo = (a, b) => Math.atan2(b.y - a.y, b.x - a.x);
@@ -114,13 +110,13 @@ function rotaCarga(s) {
   const navio = { x: 700, y: 40 };
   const cais = { x: 668, y: PIER.y };
   const viaInterna = s.transporte === 'correia'
-    ? [{ x: 515, y: 140 }, CABECA_ESTEIRA, lerp(COLETOR[0], COLETOR[1], 0.5)]
+    ? [TORRE_MEIO, CABECA_ESTEIRA, lerp(COLETOR[0], COLETOR[1], 0.5)]
     : [lerp(RODOVIA[0], RODOVIA[1], 0.86), lerp(RODOVIA[0], RODOVIA[1], 0.42), { x: 292, y: 274 }];
   const armazem = { x: 170, y: 250 };
   const saida = s.expedicao === 'pera_ferro'
     ? [lerp(FERROVIA[0], FERROVIA[1], 0.3), lerp(FERROVIA[0], FERROVIA[1], 0.02)]
     : [lerp(RODOVIA[0], RODOVIA[1], 0.3), lerp(RODOVIA[0], RODOVIA[1], 0.02)];
-  return medirCaminho([navio, cais, PIER_RAIZ, { x: 550, y: 118 }, ...viaInterna, armazem, { x: 300, y: 300 }, ...saida]);
+  return medirCaminho([navio, cais, PIER_RAIZ, ...viaInterna, armazem, { x: 300, y: 300 }, ...saida]);
 }
 
 function desenharAgua(ctx, t) {
@@ -225,16 +221,16 @@ function desenharPatio(ctx, a, cor) {
   // Pátio aberto: pilhas de granel a céu aberto no mesmo terreno dos armazéns
   ctx.fillStyle = COR.piso;
   ctx.fillRect(a.x, a.y, a.L, a.D);
-  for (let k = 0; k < 3; k++) {
-    const cx = a.x + 40 + k * 76;
+  for (let k = 0; k < 2; k++) {
+    const cx = a.x + a.L * (k ? 0.72 : 0.28);
     const cy = a.y + a.D / 2;
     ctx.fillStyle = '#0005';
     ctx.beginPath();
-    ctx.ellipse(cx + 4, cy + 5, 33, a.D / 2 - 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 4, cy + 5, a.L * 0.2, a.D / 2 - 5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = cor;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, 33, a.D / 2 - 5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, a.L * 0.2, a.D / 2 - 5, 0, 0, Math.PI * 2);
     ctx.fill();
     // Sombreamento da pilha: crista clara, base escura
     const g = ctx.createLinearGradient(0, cy - a.D / 2, 0, cy + a.D / 2);
@@ -246,29 +242,9 @@ function desenharPatio(ctx, a, cor) {
   }
 }
 
-function desenharSilos(ctx) {
-  SILOS.forEach(([x, y]) => {
-    ctx.fillStyle = '#0006';
-    ctx.beginPath();
-    ctx.ellipse(x + 3, y + 4, 9, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = COR.silo;
-    ctx.fillRect(x - 9, y - 12, 18, 12);
-    ctx.beginPath();
-    ctx.ellipse(x, y, 9, 4, 0, 0, Math.PI);
-    ctx.fill();
-    ctx.fillStyle = COR.siloTopo;
-    ctx.beginPath();
-    ctx.ellipse(x, y - 12, 9, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
-
 function desenharEsteira(ctx, pts, ativa) {
-  if (!ativa) {
-    linha(ctx, pts, '#64748b55', 3, [4, 5]);
-    return;
-  }
+  ctx.save();
+  if (!ativa) ctx.globalAlpha = 0.4;
   linha(ctx, pts, '#0005', 9);
   linha(ctx, pts, COR.esteiraTrelica, 7);
   linha(ctx, pts, COR.esteira, 4);
@@ -277,6 +253,7 @@ function desenharEsteira(ctx, pts, ativa) {
     ctx.fillStyle = COR.torre;
     ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
   });
+  ctx.restore();
 }
 
 function desenharNavio(ctx, x1, x2, y, h, ativo) {
@@ -333,6 +310,15 @@ function desenharEquipamentoCais(ctx, sistema) {
   });
 }
 
+function desenharMoega(ctx) {
+  const ang = angulo(FERROVIA[0], FERROVIA[1]);
+  const c = lerp(FERROVIA[0], FERROVIA[1], 0.3);
+  ctx.fillStyle = '#0006';
+  retanguloOrientado(ctx, { x: c.x + 4, y: c.y + 5 }, 40, 30, ang, '#0006');
+  retanguloOrientado(ctx, c, 40, 30, ang, COR.parede);
+  retanguloOrientado(ctx, c, 40, 12, ang, COR.telhado);
+}
+
 function desenharTrem(ctx, t, emExecucao) {
   const ang = angulo(FERROVIA[0], FERROVIA[1]);
   const nx = Math.sin(ang), ny = -Math.cos(ang);
@@ -382,6 +368,7 @@ export function desenharCena(ctx, s, t, particulas) {
     s.armazenagem === 'silo' ? desenharArmazem(ctx, a) : desenharPatio(ctx, a, s.produto.cor));
 
   // Expedição / recepção
+  desenharMoega(ctx);
   if (s.expedicao === 'pera_ferro') desenharTrem(ctx, t, s.emExecucao);
   else desenharCaminhoes(ctx, t, 0.0, 0.3, 4, s.emExecucao);
 
@@ -389,13 +376,14 @@ export function desenharCena(ctx, s, t, particulas) {
   const correia = s.transporte === 'correia';
   desenharEsteira(ctx, COLETOR, correia);
   desenharEsteira(ctx, ESTEIRA_PRINCIPAL, correia);
-  if (correia) {
+  {
+    ctx.save();
+    if (!correia) ctx.globalAlpha = 0.4;
     ARMAZENS.forEach(a => linha(ctx, [{ x: a.x + a.L + 13, y: a.y + a.D / 2 }, lerp(COLETOR[0], COLETOR[1], (319 - (a.y + a.D / 2)) / 138)], COR.esteira, 3));
-  } else {
-    desenharCaminhoes(ctx, t, 0.42, 0.86, 5, s.emExecucao);
+    ctx.restore();
   }
+  if (!correia) desenharCaminhoes(ctx, t, 0.42, 0.86, 5, s.emExecucao);
 
-  desenharSilos(ctx);
   desenharPier(ctx);
   desenharNavio(ctx, 612, 772, 26, 24, true);
   desenharNavio(ctx, 500, 590, 8, 16, false); // aguardando na fila
@@ -443,12 +431,11 @@ export function desenharCena(ctx, s, t, particulas) {
   });
 
   // Rótulos
-  rotulo(ctx, s.armazenagem === 'silo' ? 'TEGRAM · 4 armazéns' : 'Pátio aberto', 30, 148, COR.texto);
-  rotulo(ctx, correia ? 'Esteiras elevadas' : 'Caminhões internos', 420, 200);
-  rotulo(ctx, 'Silos', 590, 132);
+  rotulo(ctx, s.armazenagem === 'silo' ? 'TEGRAM · 4 armazéns' : 'TEGRAM', 30, 148, COR.texto);
+  rotulo(ctx, correia ? 'Esteiras elevadas' : 'Esteiras paradas · caminhões', 420, 200);
   rotulo(ctx, `Píer · ${s.berco.nome}`, 700, 80, COR.texto, 'center');
   rotulo(ctx, 'Fila', 545, 36, COR.textoSuave, 'center');
-  rotulo(ctx, 'Ferrovia', 520, 330);
+  rotulo(ctx, 'Moega Ferroviária', 520, 330);
   rotulo(ctx, 'Rodovia', 300, 360, COR.textoSuave, 'right');
 
   ctx.save();
