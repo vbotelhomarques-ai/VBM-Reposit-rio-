@@ -154,7 +154,7 @@ export default function ItaquiPortSimulator() {
     preferencias.push({ nome: 'Preferência por aparelhamento especial de cais', ref: 'Cap. 8; 7.1 §2º' });
   }
   if (embarque && BERCOS_PREF_EXPORTACAO.includes(berco.id)) {
-    preferencias.push({ nome: 'Preferência de exportação', ref: 'Cap. 8; exige 70% da carga na retroárea' });
+    preferencias.push({ nome: 'Preferência de exportação', ref: 'Cap. 8; exige 70% da carga na retroárea ou armazenada até 15 km do porto' });
   }
 
   // --- FINANÇAS E ESG ---

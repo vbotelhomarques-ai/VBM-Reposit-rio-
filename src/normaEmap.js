@@ -27,7 +27,9 @@ export const PRODUTOS = [
   { id: 'manganes', nome: 'Manganês', sentido: 'embarque', mecanizado: { '105': 667 }, naoMecanizado: { t2: 450, t1: 280 }, cor: '#a8a29e' },
   { id: 'cobre', nome: 'Concentrado de Cobre', sentido: 'embarque', mecanizado: { '105': 708 }, naoMecanizado: null, cor: '#f97316' },
   { id: 'fertilizantes', nome: 'Fertilizantes', sentido: 'descarga', mecanizado: { '101': 377 }, naoMecanizado: { t2: 300, t1: 200 }, cor: '#e2e8f0' },
-  { id: 'carvao', nome: 'Carvão Mineral / Antracita', sentido: 'descarga', mecanizado: { '101': 458 }, naoMecanizado: { t2: 375, t1: 262 }, cor: '#71717a' },
+  // A tabela mecanizada traz só "Carvão Mineral"; a não mecanizada agrupa "Carvão Mineral / Antracita".
+  { id: 'carvao', nome: 'Carvão Mineral', sentido: 'descarga', mecanizado: { '101': 458 }, naoMecanizado: { t2: 375, t1: 262 }, cor: '#71717a' },
+  { id: 'antracita', nome: 'Antracita', sentido: 'descarga', mecanizado: {}, naoMecanizado: { t2: 375, t1: 262 }, cor: '#52525b' },
   { id: 'ureia', nome: 'Ureia / Bentonita / Escória', sentido: 'descarga', mecanizado: {}, naoMecanizado: { t2: 250, t1: 150 }, cor: '#f8fafc' },
   { id: 'clinquer', nome: 'Clínquer / Calcário', sentido: 'descarga', mecanizado: {}, naoMecanizado: { t2: 292, t1: 204 }, cor: '#d6d3d1' },
   { id: 'trigo_arroz', nome: 'Trigo e Arroz', sentido: 'descarga', mecanizado: {}, naoMecanizado: { t2: 280, t1: 200 }, cor: '#fde68a' },
